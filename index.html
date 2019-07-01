@@ -1,0 +1,191 @@
+<html>
+    <head>
+        <title>toggl report</title>
+        <link rel="shortcut icon" href="data:image/ico;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAaWlpAP///wDb29sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEREQAAAAABEyEjEQAAABMSISITEAABMiIhIiIxAAESIiIiIhEAEyIiIiIiIxASIiIiIiIiEBERIiAAABEQEiIiICIiIhATIiIgIiIjEAESIiAiIhEAATIiICIiMQAAExIgIhMQAAABEyAjEQAAAAABEREAAAD//wAA+D8AAOAPAADABwAAgAMAAIADAAAAAQAAAAEAAAABAAAAAQAAAAEAAIADAACAAwAAwAcAAOAPAAD4PwAA">
+    </head>
+    <body>
+        <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+
+        <div>
+            <button onclick="setDateFields( moment().subtract( 1, 'days' ).format( 'YYYY-MM-DD' ) );">Yesterday</button>
+            <button onclick="setDateFields( moment().format( 'YYYY-MM-DD' ) );">Today</button>
+            <button onclick="setWeek();">Week</button>
+        </div>
+        <div>
+            <input type="date" name="date_from" id="date_from">
+        </div>
+        <div>
+            <input type="date" name="date_to" id="date_to">
+        </div>
+        <div>
+            <button onclick="getReport();">Get Report</button>
+        </div>
+
+        <div id="output" onclick="selectText('output');"></div>
+
+        <script>
+            // ENTER YOUR WORKSPACE ID
+            // To get your wordkspace id, open toggl and click on "reports"
+            // The url will be something like toggle.com/app/reports/summary/123456789/period/thisWeek
+            // The 123456789 is your workspaceID
+            var workspace_id = 0;
+            // ENTER YOUR API TOKEN
+            // To get your API token, click on your name in the lower left corner of Toggl and click on 'Profile Settings'
+            // Scroll down to the bottom and there should be a field for API token
+            var token        = 'YOUR-API-TOKEN-HERE:api_token';
+            var token_64     = btoa(token);
+
+            $(function () {
+                setDateFields( moment().format( 'YYYY-MM-DD' ) );
+            });
+
+            function setDateFields( d ) {
+                $('#date_from').val( d );
+                $('#date_to').val( d );
+            }
+
+            function setWeek() {
+                $('#date_from').val( moment().day(1).format( 'YYYY-MM-DD' ) );
+                $('#date_to').val( moment().format( 'YYYY-MM-DD' ) );
+            }
+
+            function selectText(containerid) {
+                if (document.selection) {
+                    var range = document.body.createTextRange();
+                    range.moveToElementText(document.getElementById(containerid));
+                    range.select();
+                } else if (window.getSelection) {
+                    var range = document.createRange();
+                    range.selectNode(document.getElementById(containerid));
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                }
+            }
+            
+            function getReport() {
+                $( '#output' ).html('');
+
+                var date_from = $('#date_from').val();
+                var date_to   = $('#date_to').val();
+
+                if ( !date_from ) {
+                    return false;
+                }
+
+                if ( !date_to ) {
+                    date_to = date_from;
+                }
+
+                if ( date_from != date_to ) {
+                    processRange( date_from, date_to );
+                } else {
+                    // processDay( date_from );
+                    processRange( date_from, date_from );
+                }
+            }
+
+            function processDay( date_work ) {
+                var url = "https://toggl.com/reports/api/v2/summary?workspace_id=" + workspace_id + "&since=" + date_work + "&until=" + date_work + "&user_agent=api_test"
+
+                $.ajax({
+                    type    : "GET",
+                    url     : url,
+                    dataType: 'json',
+                    headers : {
+                        "Authorization": "Basic " + token_64
+                    },
+                    success: function (data) {
+                        console.log(data);
+                        var output = $('#output').html();
+                        console.log( output );
+                        var append_output = parseData( data );
+                        console.log( append_output );
+
+                        output += parseData( data );
+
+                        // console.log( output );
+                        
+                        $('#output').html( output );
+                    }
+                });
+            }
+
+            Date.prototype.addDays = function (days) {
+                var date = new Date(this.valueOf());
+                date.setDate(date.getDate() + days);
+                return date;
+            }
+
+            function processRange( date_from, date_to ) {
+                if ( date_from <= date_to ) {
+                   var url = "https://toggl.com/reports/api/v2/summary?workspace_id=" + workspace_id + "&since=" + date_from + "&until=" + date_from + "&user_agent=api_test"
+
+                    $.ajax({
+                        type    : "GET",
+                        url     : url,
+                        dataType: 'json',
+                        headers : {
+                            "Authorization": "Basic " + token_64
+                        },
+                        success: function (data) {
+                            var output = $('#output').html();
+
+                            if ( output ) {
+                                output += '<br><br>';
+                            }
+                            output += '## ' + moment(date_from, 'YYYY-MM-DD').format('MM-DD') + ' ' + moment(date_from, 'YYYY-MM-DD').format('ddd');
+
+                            var append_output = parseData(data);
+
+                            output += parseData(data);
+
+                            // $('#output').html(parseData(data));
+                            $('#output').html(output);
+
+                            // increment the day, call processRange
+                            var new_date = moment(date_from, 'YYYY-MM-DD').add(1, 'd').format('YYYY-MM-DD');
+
+                            // console.log( new_date );
+
+                            if ( new_date <= date_to ) {
+                                processRange( new_date, date_to );
+                            }
+
+                        }
+                    }); 
+                }
+            }
+
+            function parseData( data ) {
+                var content     = '';
+                var project     = {};
+                var item_titles = [];
+
+                content += '<br><br>';
+                for( var idx in data.data ) {
+                    project = data.data[idx];
+                    content += '- [ ] ' + project.title.project + ' - ' + toHours( project.time ) + '<br>';
+                    for( var idx2 in project.items ) {
+                        item = project.items[idx2];
+                        item_titles.push( item.title.time_entry );
+                    }
+
+                    content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- ' + item_titles.join(', ') + '<br><br>';
+
+                    item_titles = [];
+                }
+
+                content += '- [ ] Total - ' + toHours( data.total_grand );
+
+                return content;
+            }
+
+            function toHours( ms ) {
+                var hours   = ms / 3600000;
+                return hours;
+            }
+
+        </script>
+    </body>
+</html>
